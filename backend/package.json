@@ -1,0 +1,31 @@
+{
+  "name": "soundmate-ar-backend",
+  "version": "1.0.0",
+  "description": "SoundMate AR Backend - Location-based music discovery app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node scripts/migrate.js up",
+    "db:reset": "node scripts/migrate.js reset",
+    "db:status": "node scripts/migrate.js status",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["music", "spotify", "location", "h3", "ar"],
+  "author": "SoundMate AR Team",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.0",
+    "express": "^4.18.2",
+    "pg": "^8.11.0",
+    "h3-js": "^4.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
