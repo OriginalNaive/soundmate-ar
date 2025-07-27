@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const { validate, schemas } = require('../middleware/validation');
 
 // 中間件：驗證 access token
 const verifyToken = (req, res, next) => {
@@ -86,18 +87,8 @@ router.get('/current', verifyToken, async (req, res) => {
 });
 
 // 記錄播放資料
-router.post('/playback', verifyToken, async (req, res) => {
+router.post('/playback', verifyToken, validate(schemas.playbackRecord), async (req, res) => {
   const { track_data, location, hex_id } = req.body;
-
-  if (!track_data || !location || !hex_id) {
-    return res.status(400).json({ 
-      success: false, 
-      error: { 
-        code: 'MISSING_DATA', 
-        message: 'Track data, location, and hex_id are required' 
-      }
-    });
-  }
 
   try {
     const User = require('../models/User');
@@ -105,6 +96,7 @@ router.post('/playback', verifyToken, async (req, res) => {
     const Playback = require('../models/Playback');
     const HexProperty = require('../models/HexProperty');
     const HexTopTrack = require('../models/HexTopTrack');
+    const MusicFeaturesService = require('../services/musicFeatures');
 
     // 1. 獲取當前用戶
     const user = await User.findByAccessToken(req.accessToken);
@@ -118,7 +110,26 @@ router.post('/playback', verifyToken, async (req, res) => {
     // 2. 創建或獲取歌曲記錄
     const track = await Track.createOrGet(track_data);
 
-    // 3. 檢查是否為重複播放 (30秒內同一首歌)
+    // 3. 檢查是否需要獲取音樂特徵
+    const needsFeatures = !track.audio_features || !track.color_hex;
+    
+    if (needsFeatures) {
+      // 異步獲取音樂特徵 (不阻塞主流程)
+      setImmediate(async () => {
+        try {
+          await MusicFeaturesService.updateTrackFeatures(
+            track.id, 
+            track.spotify_track_id, 
+            req.accessToken
+          );
+          console.log('音樂特徵已更新:', track.spotify_track_id);
+        } catch (error) {
+          console.error('獲取音樂特徵失敗:', error.message);
+        }
+      });
+    }
+
+    // 4. 檢查是否為重複播放 (30秒內同一首歌)
     const isDuplicate = await Playback.checkDuplicate(
       user.id, track.id, hex_id, 30
     );
@@ -135,7 +146,7 @@ router.post('/playback', verifyToken, async (req, res) => {
       });
     }
 
-    // 4. 記錄播放資料
+    // 5. 記錄播放資料
     const playbackRecord = await Playback.create({
       user_id: user.id,
       track_id: track.id,
@@ -147,18 +158,23 @@ router.post('/playback', verifyToken, async (req, res) => {
       is_playing: track_data.is_playing !== false
     });
 
-    // 5. 更新 hex_properties (如果需要)
+    // 6. 更新 hex_properties (如果需要)
     await HexProperty.createOrGet(hex_id, location.lat, location.lng);
 
-    // 6. 更新 hex_top_tracks
+    // 7. 更新 hex_top_tracks
     await HexTopTrack.createOrUpdate(hex_id, track.id, playbackRecord.played_at);
 
-    // 7. 異步更新統計資料 (不阻塞回應)
+    // 8. 異步更新統計資料 (不阻塞回應)
     setImmediate(async () => {
       try {
         await HexProperty.updateStats(hex_id);
         await HexTopTrack.recalculateRankScores(hex_id);
         await User.updateLastActive(user.spotify_id);
+        
+        // 如果有音樂特徵，更新 hex 聚合特徵
+        if (track.audio_features) {
+          await HexProperty.updateAggregateFeatures(hex_id);
+        }
       } catch (error) {
         console.error('Background stats update error:', error);
       }
@@ -169,7 +185,8 @@ router.post('/playback', verifyToken, async (req, res) => {
       track: track.name,
       artist: track.artist,
       location: `${location.lat}, ${location.lng}`,
-      hex_id
+      hex_id,
+      hasFeatures: !!track.audio_features
     });
 
     res.json({ 
@@ -178,7 +195,8 @@ router.post('/playback', verifyToken, async (req, res) => {
         message: 'Playback recorded successfully',
         hex_id,
         track_id: track.spotify_track_id,
-        playback_id: playbackRecord.id
+        playback_id: playbackRecord.id,
+        features_processing: needsFeatures
       },
       timestamp: new Date().toISOString()
     });
@@ -197,8 +215,8 @@ router.post('/playback', verifyToken, async (req, res) => {
 });
 
 // 獲取用戶播放歷史
-router.get('/history', verifyToken, async (req, res) => {
-  const { limit = 20, offset = 0 } = req.query;
+router.get('/history', verifyToken, validate(schemas.pagination, 'query'), async (req, res) => {
+  const { limit, offset } = req.query;
 
   try {
     const User = require('../models/User');

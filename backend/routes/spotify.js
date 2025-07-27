@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const { validate, schemas } = require('../middleware/validation');
 
 // Spotify 登入授權
 router.get('/login', (req, res) => {
@@ -113,15 +114,8 @@ router.get('/callback', async (req, res) => {
 });
 
 // 刷新 access token
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', validate(schemas.refreshToken), async (req, res) => {
   const { refresh_token } = req.body;
-
-  if (!refresh_token) {
-    return res.status(400).json({ 
-      success: false, 
-      error: { code: 'MISSING_REFRESH_TOKEN', message: 'Refresh token is required' }
-    });
-  }
 
   const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET } = process.env;
   const auth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');

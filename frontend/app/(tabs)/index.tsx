@@ -10,8 +10,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import SpotifyAuth from '@/components/SpotifyAuth';
 import { getStoredAccessToken } from '@/services/spotifyAuth';
-
-const API_BASE_URL = 'http://192.168.1.106:5000/api';
+import { API_BASE_URL, fetchWithRetry, handleNetworkError } from '@/config/api';
 
 export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);

@@ -2,35 +2,14 @@ const express = require('express');
 const router = express.Router();
 const h3 = require('h3-js');
 const { query } = require('../config/database');
+const { validate, schemas } = require('../middleware/validation');
 
 // H3 解析度設定
 const H3_RESOLUTION = parseInt(process.env.H3_RESOLUTION) || 9; // 預設使用 resolution 9
 
 // 更新用戶位置並計算 H3 hex
-router.post('/update', async (req, res) => {
-  const { lat, lng, hex_id } = req.body;
-
-  // 驗證輸入參數
-  if (!lat || !lng || typeof lat !== 'number' || typeof lng !== 'number') {
-    return res.status(400).json({ 
-      success: false, 
-      error: { 
-        code: 'INVALID_COORDINATES', 
-        message: 'Valid latitude and longitude are required' 
-      }
-    });
-  }
-
-  // 驗證座標範圍
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    return res.status(400).json({ 
-      success: false, 
-      error: { 
-        code: 'COORDINATES_OUT_OF_RANGE', 
-        message: 'Coordinates are out of valid range' 
-      }
-    });
-  }
+router.post('/update', validate(schemas.locationUpdate), async (req, res) => {
+  const { lat, lng } = req.body;
 
   try {
     const HexProperty = require('../models/HexProperty');

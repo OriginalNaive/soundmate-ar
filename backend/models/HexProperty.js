@@ -130,6 +130,153 @@ class HexProperty {
     return result.rows[0] || null;
   }
 
+  // 更新 Hex 的聚合音樂特徵
+  static async updateAggregateFeatures(hexId) {
+    try {
+      // 計算該 hex 所有歌曲的平均音樂特徵
+      const result = await query(`
+        SELECT 
+          AVG((t.audio_features->>'energy')::float) as avg_energy,
+          AVG((t.audio_features->>'valence')::float) as avg_valence,
+          AVG((t.audio_features->>'danceability')::float) as avg_danceability,
+          AVG((t.audio_features->>'acousticness')::float) as avg_acousticness,
+          AVG((t.audio_features->>'instrumentalness')::float) as avg_instrumentalness,
+          COUNT(*) as feature_count
+        FROM user_playback up
+        JOIN tracks t ON up.track_id = t.id
+        WHERE up.hex_id = $1 
+          AND t.audio_features IS NOT NULL
+          AND up.played_at >= NOW() - INTERVAL '30 days'
+      `, [hexId]);
+
+      if (result.rows.length === 0 || result.rows[0].feature_count === 0) {
+        console.log(`No audio features found for hex ${hexId}`);
+        return null;
+      }
+
+      const features = result.rows[0];
+      
+      // 如果特徵不完整，跳過
+      if (!features.avg_energy || !features.avg_valence || !features.avg_danceability) {
+        console.log(`Incomplete features for hex ${hexId}`);
+        return null;
+      }
+
+      // 使用音樂特徵服務計算色彩
+      const MusicFeaturesService = require('../services/musicFeatures');
+      const aggregateFeatures = {
+        energy: parseFloat(features.avg_energy),
+        valence: parseFloat(features.avg_valence),
+        danceability: parseFloat(features.avg_danceability),
+        acousticness: parseFloat(features.avg_acousticness) || 0.5,
+        instrumentalness: parseFloat(features.avg_instrumentalness) || 0.1
+      };
+
+      const colorHex = MusicFeaturesService.featuresToColor(aggregateFeatures);
+
+      // 更新資料庫
+      const updateResult = await query(`
+        UPDATE hex_properties SET
+          avg_energy = $1,
+          avg_valence = $2,
+          avg_danceability = $3,
+          avg_acousticness = $4,
+          avg_instrumentalness = $5,
+          color_hex = $6,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE hex_id = $7
+        RETURNING *
+      `, [
+        aggregateFeatures.energy,
+        aggregateFeatures.valence,
+        aggregateFeatures.danceability,
+        aggregateFeatures.acousticness,
+        aggregateFeatures.instrumentalness,
+        colorHex,
+        hexId
+      ]);
+
+      console.log(`Hex ${hexId} 聚合特徵已更新:`, {
+        color: colorHex,
+        energy: aggregateFeatures.energy.toFixed(2),
+        valence: aggregateFeatures.valence.toFixed(2),
+        danceability: aggregateFeatures.danceability.toFixed(2),
+        trackCount: features.feature_count
+      });
+
+      return updateResult.rows[0];
+    } catch (error) {
+      console.error(`更新 hex ${hexId} 聚合特徵失敗:`, error.message);
+      throw error;
+    }
+  }
+
+  // 批量更新多個 Hex 的聚合特徵
+  static async batchUpdateAggregateFeatures(hexIds) {
+    const results = [];
+    
+    for (const hexId of hexIds) {
+      try {
+        const result = await this.updateAggregateFeatures(hexId);
+        if (result) {
+          results.push(result);
+        }
+      } catch (error) {
+        console.error(`批量更新 hex ${hexId} 失敗:`, error.message);
+      }
+    }
+    
+    return results;
+  }
+
+  // 獲取需要更新特徵的 Hex 列表
+  static async getHexesNeedingFeatureUpdate(limit = 50) {
+    const result = await query(`
+      SELECT DISTINCT hp.hex_id
+      FROM hex_properties hp
+      WHERE hp.total_plays > 0
+        AND (hp.color_hex IS NULL OR hp.updated_at < NOW() - INTERVAL '1 hour')
+        AND EXISTS (
+          SELECT 1 FROM user_playback up
+          JOIN tracks t ON up.track_id = t.id
+          WHERE up.hex_id = hp.hex_id 
+            AND t.audio_features IS NOT NULL
+        )
+      ORDER BY hp.total_plays DESC
+      LIMIT $1
+    `, [limit]);
+
+    return result.rows.map(row => row.hex_id);
+  }
+
+  // 生成 Hex 音樂標籤
+  static async generateHexMoodTags(hexId) {
+    try {
+      const result = await query(`
+        SELECT avg_energy, avg_valence, avg_danceability, avg_acousticness
+        FROM hex_properties
+        WHERE hex_id = $1
+      `, [hexId]);
+
+      if (result.rows.length === 0) {
+        return [];
+      }
+
+      const features = result.rows[0];
+      const MusicFeaturesService = require('../services/musicFeatures');
+      
+      return MusicFeaturesService.generateMoodTags({
+        energy: features.avg_energy || 0.5,
+        valence: features.avg_valence || 0.5,
+        danceability: features.avg_danceability || 0.5,
+        acousticness: features.avg_acousticness || 0.5
+      });
+    } catch (error) {
+      console.error(`生成 hex ${hexId} 標籤失敗:`, error.message);
+      return [];
+    }
+  }
+
   // 清理無活動的 Hex (維護用)
   static async cleanupInactiveHexes(daysAgo = 30) {
     const result = await query(

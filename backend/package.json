@@ -9,9 +9,17 @@
     "migrate": "node scripts/migrate.js up",
     "db:reset": "node scripts/migrate.js reset",
     "db:status": "node scripts/migrate.js status",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
-  "keywords": ["music", "spotify", "location", "h3", "ar"],
+  "keywords": [
+    "music",
+    "spotify",
+    "location",
+    "h3",
+    "ar"
+  ],
   "author": "SoundMate AR Team",
   "license": "ISC",
   "dependencies": {
@@ -19,11 +27,20 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.0",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.0.1",
+    "express-slow-down": "^2.1.0",
+    "h3-js": "^4.1.0",
+    "helmet": "^8.1.0",
+    "joi": "^17.13.3",
     "pg": "^8.11.0",
-    "h3-js": "^4.1.0"
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "@jest/globals": "^30.0.5",
+    "jest": "^30.0.5",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
   },
   "engines": {
     "node": ">=16.0.0"

@@ -110,3 +110,18 @@ $RECYCLE.BIN/
 
 # Spotify credentials (security)
 **/spotify_credentials.json
+
+# Local development files
+test-*.js
+demo-server-fixed.js
+test-simple.js
+
+# Logs directory
+backend/logs/
+*.log
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Temporary development files
+dev*.md

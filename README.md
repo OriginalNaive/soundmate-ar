@@ -1,13 +1,35 @@
-# SoundMate AR - 音樂地圖探索應用
+# 🎵 SoundMate AR - 音樂地圖探索應用
 
-基於位置的音樂發現與社交平台，使用 React Native + Node.js + PostgreSQL + Spotify API 開發。
+**創新的位置感知音樂發現平台，結合AR技術與地理空間音樂映射**
+
+SoundMate AR 是一個基於位置的音樂探索應用，使用 React Native + Node.js + PostgreSQL + Spotify API 開發，讓用戶透過地圖視覺化發現周圍的音樂熱點。
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![React Native](https://img.shields.io/badge/React%20Native-Expo-blue.svg)](https://expo.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://postgresql.org/)
 
 ## 🌟 功能特色
 
-- **Spotify 整合**: 自動獲取並記錄用戶的播放資料
-- **位置服務**: 使用 H3 六角形網格系統聚合地理位置
-- **音樂地圖**: 在地圖上探索附近的音樂活動熱點
-- **即時更新**: 自動同步播放狀態和位置資訊
+### 🗺️ **互動式音樂地圖**
+- H3六角形網格的即時音樂熱點視覺化
+- 基於音樂特徵的色彩編碼區域（能量、情緒、舞曲性）
+- 位置感知的音樂發現與推薦
+
+### 🎨 **音樂視覺化**
+- 先進的音樂特徵分析與色彩映射
+- HSV色彩空間表現音樂情感
+- 基於音頻特徵的動態視覺回饋
+
+### 📱 **跨平台支援**
+- React Native + Expo 開發的行動應用
+- iOS 和 Android 兼容性
+- Expo Go 測試支援，內建網路診斷工具
+
+### 🔗 **Spotify 深度整合**
+- OAuth 2.0 身份驗證
+- 即時播放追蹤與記錄
+- 音樂特徵提取與分析
 
 ## 🛠 技術架構
 
