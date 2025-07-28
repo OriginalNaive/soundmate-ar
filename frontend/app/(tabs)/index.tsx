@@ -21,8 +21,14 @@ export default function HomeScreen() {
 
   // 檢查登入狀態和自動獲取位置
   useEffect(() => {
+    console.log('🚀 應用啟動，開始初始化...');
     checkAuthStatus();
-    getLocation(); // 自動獲取位置
+    
+    // 延遲獲取位置以避免權限衝突
+    setTimeout(() => {
+      console.log('⏰ 開始自動獲取位置...');
+      getLocation();
+    }, 1000);
   }, []);
 
   // 定期更新播放狀態
@@ -82,18 +88,24 @@ export default function HomeScreen() {
 
   const getLocation = async () => {
     try {
+      console.log('🎯 開始獲取位置...');
       setIsLoading(true);
       
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('📍 位置權限狀態:', status);
+      
       if (status !== 'granted') {
+        console.log('❌ 位置權限被拒絕');
         Alert.alert('權限被拒絕', '需要位置權限才能使用此功能');
         return;
       }
 
+      console.log('📍 正在獲取當前位置...');
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
       
+      console.log('✅ 位置獲取成功:', { lat: loc.coords.latitude, lng: loc.coords.longitude });
       setLocation(loc.coords);
 
       // 更新位置到後端
@@ -115,12 +127,27 @@ export default function HomeScreen() {
         
         // 作為備用方案，在前端計算 hex_id
         try {
-          const h3 = await import('h3-js');
-          const hexId = h3.latLngToCell(loc.coords.latitude, loc.coords.longitude, 9);
+          const { latLngToCell } = await import('h3-js');
+          const hexId = latLngToCell(loc.coords.latitude, loc.coords.longitude, 9);
           setCurrentHex(hexId);
           console.log('✅ 使用前端計算的 hex_id:', hexId);
         } catch (h3Error) {
           console.error('前端 H3 計算也失敗:', h3Error);
+          // 如果 H3 也失敗，創建一個臨時的 hex_id
+          const tempHexId = `temp_${Math.round(loc.coords.latitude * 1000)}_${Math.round(loc.coords.longitude * 1000)}`;
+          setCurrentHex(tempHexId);
+          console.log('✅ 使用臨時 hex_id:', tempHexId);
+        }
+        
+        // 確保位置狀態也正確設置
+        console.log('✅ 最終設置位置狀態:', loc.coords);
+        
+        // 如果當前有播放歌曲，嘗試重新記錄
+        if (currentTrack) {
+          console.log('🔄 位置獲取完成，重新檢查播放記錄...');
+          setTimeout(() => {
+            updateCurrentTrack();
+          }, 500);
         }
       }
     } catch (error) {
@@ -161,11 +188,18 @@ export default function HomeScreen() {
           setCurrentTrack(track);
           
           // 如果有位置和歌曲，記錄播放資料
+          console.log('🔍 檢查播放記錄所需資料:', { 
+            hasLocation: !!location, 
+            hasCurrentHex: !!currentHex,
+            locationDetails: location,
+            currentHexValue: currentHex
+          });
+          
           if (location && currentHex) {
-            console.log('準備記錄播放資料:', { track: track.name, location, currentHex });
+            console.log('✅ 準備記錄播放資料:', { track: track.name, location, currentHex });
             await recordPlayback(track);
           } else {
-            console.log('缺少記錄播放所需資料:', { hasLocation: !!location, hasCurrentHex: !!currentHex });
+            console.log('❌ 缺少記錄播放所需資料:', { hasLocation: !!location, hasCurrentHex: !!currentHex });
           }
         } else {
           console.log('沒有正在播放的歌曲');

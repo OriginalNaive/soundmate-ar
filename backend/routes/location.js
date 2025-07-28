@@ -13,7 +13,8 @@ router.post('/update', validate(schemas.locationUpdate), async (req, res) => {
   const { lat, lng } = req.body;
 
   try {
-    const HexProperty = require('../models/HexProperty');
+    const { HexProperty } = require('../models');
+    console.log('使用的 HexProperty 模型:', HexProperty.createOrGet.toString().substring(0, 100));
     
     // 計算 H3 hex ID
     const calculatedHexId = h3.latLngToCell(lat, lng, H3_RESOLUTION);
@@ -23,7 +24,7 @@ router.post('/update', validate(schemas.locationUpdate), async (req, res) => {
     
     // 創建或獲取 hex 屬性
     const hexProperties = await HexProperty.createOrGet(
-      calculatedHexId, centerLat, centerLng, H3_RESOLUTION
+      calculatedHexId, centerLat, centerLng
     );
 
     res.json({ 
@@ -63,7 +64,7 @@ router.get('/hex/:hex_id', async (req, res) => {
   }
 
   try {
-    const HexProperty = require('../models/HexProperty');
+    const { HexProperty } = require('../models');
     const HexTopTrack = require('../models/HexTopTrack');
 
     // 獲取 hex 屬性
@@ -124,7 +125,7 @@ router.get('/hex/nearby', async (req, res) => {
     const nearbyHexes = h3.gridDisk(centerHex, 2); // 獲取距離 2 的所有 hex
 
     // 從資料庫查詢這些 hex 的資料
-    const HexProperty = require('../models/HexProperty');
+    const { HexProperty } = require('../models');
     const hexesResult = await HexProperty.getHexesByIds(nearbyHexes);
 
     res.json({ 

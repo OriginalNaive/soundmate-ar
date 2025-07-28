@@ -7,7 +7,11 @@ if (dbType === 'sqlite') {
   // SQLite 模型
   models = {
     HexProperty: require('./sqlite/HexProperty'),
-    // 可以添加其他 SQLite 模型
+    // SQLite 使用相同的其他模型
+    Playback: require('./Playback'),
+    Track: require('./Track'),
+    User: require('./User'),
+    HexTopTrack: require('./HexTopTrack'),
   };
 } else {
   // PostgreSQL 模型 (原有模型)

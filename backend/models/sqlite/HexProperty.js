@@ -2,7 +2,7 @@ const { query } = require('../../config/database');
 
 class HexProperty {
   // 創建或獲取 Hex 屬性
-  static async createOrGet(hexId, centerLat, centerLng, resolution = 9) {
+  static async createOrGet(hexId, centerLat, centerLng) {
     // 先嘗試獲取現有的
     let result = await query(
       'SELECT * FROM hex_properties WHERE hex_id = ?',
