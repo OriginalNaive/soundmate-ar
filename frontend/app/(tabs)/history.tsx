@@ -1,30 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, RefreshControl } from 'react-native';
-import { Image } from 'expo-image';
-import axios from 'axios';
-
+import { 
+  ScrollView, 
+  StyleSheet, 
+  ActivityIndicator, 
+  TouchableOpacity, 
+  RefreshControl,
+  View 
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { getStoredAccessToken } from '@/services/spotifyAuth';
-
-const API_BASE_URL = 'http://192.168.1.106:5000/api';
 
 interface PlaybackRecord {
-  id: string;
+  id: number;
+  track_id: string;
   track_name: string;
   artist_name: string;
   album_name: string;
-  image_url?: string;
+  duration_ms: number;
   played_at: string;
-  location?: {
-    lat: number;
-    lng: number;
-  };
-  hex_id?: string;
+  hex_id: string;
+  latitude: number;
+  longitude: number;
 }
 
-export default function MusicHistoryScreen() {
-  const [records, setRecords] = useState<PlaybackRecord[]>([]);
+export default function HistoryScreen() {
+  const [playbackHistory, setPlaybackHistory] = useState<PlaybackRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -34,44 +36,69 @@ export default function MusicHistoryScreen() {
 
   const loadPlaybackHistory = async () => {
     try {
-      // 暫時使用模擬數據，直到數據庫設置完成
       console.log('載入播放記錄...');
       
-      // 模擬載入時間
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 獲取 Spotify access token
+      const { getStoredAccessToken } = await import('@/services/spotifyAuth');
+      const accessToken = await getStoredAccessToken();
       
-      setRecords([
-        {
-          id: '1',
-          track_name: 'As It Was',
-          artist_name: 'Harry Styles',
-          album_name: "Harry's House",
-          image_url: 'https://i.scdn.co/image/ab67616d0000b273b46f74097655d7f353caab14',
-          played_at: new Date().toISOString(),
-          location: { lat: 25.0330, lng: 121.5654 }
-        },
-        {
-          id: '2',
-          track_name: 'Anti-Hero',
-          artist_name: 'Taylor Swift',
-          album_name: 'Midnights',
-          image_url: 'https://i.scdn.co/image/ab67616d0000b273bb54dde68cd23e2a268ae0f5',
-          played_at: new Date(Date.now() - 3600000).toISOString(),
-          location: { lat: 25.0340, lng: 121.5660 }
-        },
-        {
-          id: '3',
-          track_name: 'Flowers',
-          artist_name: 'Miley Cyrus',
-          album_name: 'Endless Summer Vacation',
-          image_url: 'https://i.scdn.co/image/ab67616d0000b273f4fdcd41b9b058ec4a851c6e',
-          played_at: new Date(Date.now() - 7200000).toISOString(),
-          location: { lat: 25.0350, lng: 121.5670 }
+      if (!accessToken) {
+        console.log('沒有 access token，顯示空記錄');
+        setPlaybackHistory([]);
+        return;
+      }
+
+      // 調用後端 API 獲取真實播放記錄
+      const { API_BASE_URL, fetchWithRetry } = await import('@/config/api');
+      const apiUrl = `${API_BASE_URL}/music/history?limit=20`;
+      console.log('正在調用歷史記錄 API:', apiUrl);
+      
+      const response = await fetchWithRetry(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
         }
-      ]);
-    } catch (error) {
+      });
+      
+      console.log('API 回應狀態:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.tracks) {
+          console.log(`✅ 載入 ${data.data.tracks.length} 筆真實播放記錄`);
+          
+          // 轉換資料格式以符合前端需求
+          const formattedHistory = data.data.tracks.map((record: any) => ({
+            id: record.id,
+            track_id: record.track_id,
+            track_name: record.track_name,
+            artist_name: record.artist_name,
+            album_name: record.album_name || 'Unknown Album',
+            duration_ms: record.duration_ms || 0,
+            played_at: record.played_at,
+            hex_id: record.hex_id,
+            latitude: record.latitude,
+            longitude: record.longitude
+          }));
+          
+          setPlaybackHistory(formattedHistory);
+          return;
+        }
+      }
+      
+      // 如果 API 調用失敗，顯示空記錄
+      throw new Error(`API 調用失敗: ${response.status}`);
+    } catch (error: any) {
       console.error('獲取播放記錄失敗:', error);
-      setRecords([]);
+      console.error('錯誤詳情:', error.message);
+      
+      // 如果是網路錯誤或 token 過期，顯示適當訊息
+      if (error.message?.includes('401')) {
+        console.log('Token 可能已過期，需要重新登入');
+      }
+      
+      setPlaybackHistory([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -81,6 +108,12 @@ export default function MusicHistoryScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadPlaybackHistory();
+  };
+
+  const formatDuration = (ms: number): string => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const formatPlayedAt = (dateString: string) => {
@@ -100,101 +133,163 @@ export default function MusicHistoryScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1DB954" />
-          <ThemedText style={styles.loadingText}>載入播放記錄...</ThemedText>
-        </ThemedView>
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1DB954" />
+        <ThemedText style={styles.loadingText}>載入播放記錄中...</ThemedText>
       </ThemedView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedView style={styles.header}>
-        <ThemedText type="title">播放記錄</ThemedText>
+    <ParallaxScrollView
+      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerImage={
+        <Ionicons
+          size={310}
+          name="library-outline"
+          style={styles.headerImage}
+        />
+      }
+    >
+      <ThemedView style={styles.titleContainer}>
+        <ThemedText type="title">播放歷史</ThemedText>
         <ThemedText style={styles.subtitle}>
-          共 {records.length} 首歌曲
+          探索您的音樂足跡與偏好
         </ThemedText>
       </ThemedView>
 
-      <ScrollView 
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {records.length === 0 ? (
-          <ThemedView style={styles.emptyContainer}>
-            <ThemedText style={styles.emptyText}>尚無播放記錄</ThemedText>
-            <ThemedText style={styles.emptySubtext}>
-              開始播放音樂後，記錄將會顯示在這裡
-            </ThemedText>
-          </ThemedView>
-        ) : (
-          records.map((record) => (
-            <TouchableOpacity key={record.id} style={styles.recordCard}>
-              <ThemedView style={styles.recordContent}>
-                {record.image_url && (
-                  <Image 
-                    source={{ uri: record.image_url }} 
-                    style={styles.albumCover}
-                  />
-                )}
-                <ThemedView style={styles.trackInfo}>
-                  <ThemedText type="defaultSemiBold" style={styles.trackName}>
-                    {record.track_name}
-                  </ThemedText>
-                  <ThemedText style={styles.artistName}>
-                    {record.artist_name}
-                  </ThemedText>
-                  <ThemedText style={styles.albumName}>
-                    {record.album_name}
-                  </ThemedText>
-                  <ThemedView style={styles.metaInfo}>
-                    <ThemedText style={styles.playedAt}>
-                      🕐 {formatPlayedAt(record.played_at)}
+      <ThemedView style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Ionicons name="musical-notes" size={24} color="#1DB954" />
+          <ThemedText style={styles.statNumber}>{playbackHistory.length}</ThemedText>
+          <ThemedText style={styles.statLabel}>總播放次數</ThemedText>
+        </View>
+        
+        <View style={styles.statCard}>
+          <Ionicons name="library" size={24} color="#1DB954" />
+          <ThemedText style={styles.statNumber}>
+            {new Set(playbackHistory.map(r => r.track_id)).size}
+          </ThemedText>
+          <ThemedText style={styles.statLabel}>不同歌曲</ThemedText>
+        </View>
+      </ThemedView>
+
+      <ThemedView style={styles.historyContainer}>
+        <ThemedText style={styles.sectionTitle}>最近播放</ThemedText>
+        
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#1DB954']}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {playbackHistory.length === 0 ? (
+            <ThemedView style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyText}>尚無播放記錄</ThemedText>
+              <ThemedText style={styles.emptySubtext}>
+                開始播放音樂後，記錄將會顯示在這裡
+              </ThemedText>
+            </ThemedView>
+          ) : (
+            playbackHistory.map((record) => (
+              <TouchableOpacity key={record.id} style={styles.recordCard}>
+                <ThemedView style={styles.recordContent}>
+                  <ThemedView style={styles.trackInfo}>
+                    <ThemedText style={styles.trackName}>
+                      {record.track_name}
                     </ThemedText>
-                    {record.location && (
-                      <ThemedText style={styles.location}>
-                        📍 {record.location.lat.toFixed(4)}, {record.location.lng.toFixed(4)}
+                    <ThemedText style={styles.artistName}>
+                      {record.artist_name}
+                    </ThemedText>
+                    <ThemedText style={styles.albumName}>
+                      {record.album_name}
+                    </ThemedText>
+                    <ThemedView style={styles.metaInfo}>
+                      <ThemedText style={styles.playedAt}>
+                        🕐 {formatPlayedAt(record.played_at)}
                       </ThemedText>
-                    )}
+                      <ThemedText style={styles.duration}>
+                        ⏱️ {formatDuration(record.duration_ms)}
+                      </ThemedText>
+                      <ThemedText style={styles.location}>
+                        📍 {record.hex_id.substring(0, 8)}...
+                      </ThemedText>
+                    </ThemedView>
                   </ThemedView>
                 </ThemedView>
-              </ThemedView>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-    </ThemedView>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </ThemedView>
+    </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  headerImage: {
+    color: '#808080',
+    bottom: -90,
+    left: -35,
+    position: 'absolute',
   },
-  header: {
-    padding: 20,
-    paddingBottom: 10,
+  titleContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
   },
   subtitle: {
+    fontSize: 16,
     opacity: 0.7,
-    marginTop: 5,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 20,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   loadingText: {
     marginTop: 10,
+    fontSize: 16,
     opacity: 0.7,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  statCard: {
+    backgroundColor: 'rgba(29, 185, 84, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  historyContainer: {
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
   emptyContainer: {
     flex: 1,
@@ -218,21 +313,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   recordContent: {
-    flexDirection: 'row',
-    padding: 12,
-    alignItems: 'center',
-  },
-  albumCover: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
+    padding: 16,
   },
   trackInfo: {
     flex: 1,
   },
   trackName: {
     fontSize: 16,
+    fontWeight: '600',
     marginBottom: 4,
   },
   artistName: {
@@ -246,10 +334,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   metaInfo: {
-    flexDirection: 'column',
-    gap: 2,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
   playedAt: {
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  duration: {
     fontSize: 11,
     opacity: 0.6,
   },

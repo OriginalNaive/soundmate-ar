@@ -116,11 +116,16 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// 導入路由
+// 導入路由 - 根據資料庫類型選擇
+const dbType = process.env.DB_TYPE || 'postgresql';
 const spotifyAuth = require('./routes/spotify');
 const musicRoutes = require('./routes/music');
 const locationRoute = require('./routes/location');
-const mapRoutes = require('./routes/map');
+
+// 根據資料庫類型選擇地圖路由
+const mapRoutes = dbType === 'sqlite' 
+  ? require('./routes/sqlite/map')
+  : require('./routes/map');
 
 // 設定路由 (套用特定速率限制)
 app.use('/api/auth/spotify', strictLimit, spotifyAuth);

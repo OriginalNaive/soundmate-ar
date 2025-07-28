@@ -19,9 +19,10 @@ export default function HomeScreen() {
   const [currentHex, setCurrentHex] = useState<string | null>(null);
   const [currentTrack, setCurrentTrack] = useState<any>(null);
 
-  // 檢查登入狀態
+  // 檢查登入狀態和自動獲取位置
   useEffect(() => {
     checkAuthStatus();
+    getLocation(); // 自動獲取位置
   }, []);
 
   // 定期更新播放狀態
@@ -32,6 +33,29 @@ export default function HomeScreen() {
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  const syncUserToBackend = async (accessToken: string, userData: any) => {
+    try {
+      console.log('正在同步用戶資訊到後端...');
+      const response = await axios.post(`${API_BASE_URL}/auth/spotify/sync`, {
+        user_data: {
+          spotify_id: userData.id,
+          display_name: userData.display_name,
+          email: userData.email,
+          profile_image_url: userData.images?.[0]?.url || null
+        },
+        access_token: accessToken
+      });
+      
+      if (response.data.success) {
+        console.log('✅ 用戶資訊同步成功');
+      } else {
+        console.log('❌ 用戶資訊同步失敗:', response.data.error);
+      }
+    } catch (error: any) {
+      console.log('❌ 用戶同步 API 調用失敗:', error.response?.data || error.message);
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {
@@ -45,6 +69,9 @@ export default function HomeScreen() {
           const userData = await response.json();
           setUser(userData);
           console.log('用戶已登入:', userData.display_name);
+          
+          // 同步用戶資訊到後端數據庫
+          await syncUserToBackend(token, userData);
         }
       }
     } catch (error) {
@@ -71,6 +98,7 @@ export default function HomeScreen() {
 
       // 更新位置到後端
       try {
+        console.log('正在更新位置到後端:', { lat: loc.coords.latitude, lng: loc.coords.longitude });
         const response = await axios.post(`${API_BASE_URL}/location/update`, {
           lat: loc.coords.latitude,
           lng: loc.coords.longitude
@@ -78,11 +106,22 @@ export default function HomeScreen() {
 
         if (response.data.success) {
           setCurrentHex(response.data.data.hex_id);
-          console.log('位置更新成功:', response.data.data);
+          console.log('✅ 位置更新成功，獲得 hex_id:', response.data.data.hex_id);
+        } else {
+          console.log('❌ 位置更新 API 回應失敗:', response.data);
         }
-      } catch (apiError) {
-        console.log('後端 API 調用失敗，但位置獲取成功:', apiError);
-        // 位置獲取成功，只是後端調用失敗，不顯示錯誤
+      } catch (apiError: any) {
+        console.log('❌ 後端位置 API 調用失敗:', apiError.response?.data || apiError.message);
+        
+        // 作為備用方案，在前端計算 hex_id
+        try {
+          const h3 = await import('h3-js');
+          const hexId = h3.latLngToCell(loc.coords.latitude, loc.coords.longitude, 9);
+          setCurrentHex(hexId);
+          console.log('✅ 使用前端計算的 hex_id:', hexId);
+        } catch (h3Error) {
+          console.error('前端 H3 計算也失敗:', h3Error);
+        }
       }
     } catch (error) {
       console.error('獲取位置失敗:', error);
@@ -95,14 +134,21 @@ export default function HomeScreen() {
   const updateCurrentTrack = async () => {
     try {
       const accessToken = await getStoredAccessToken();
-      if (!accessToken) return;
+      if (!accessToken) {
+        console.log('沒有 Spotify access token');
+        return;
+      }
 
+      console.log('正在獲取當前播放狀態...');
       const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
+      console.log('Spotify API 回應狀態:', response.status);
+
       if (response.ok && response.status !== 204) {
         const data = await response.json();
+        console.log('Spotify 當前播放資料:', data);
         if (data.item) {
           const track = {
             id: data.item.id,
@@ -111,14 +157,22 @@ export default function HomeScreen() {
             album: data.item.album.name,
             image_url: data.item.album.images[0]?.url
           };
+          console.log('設定當前播放歌曲:', track);
           setCurrentTrack(track);
           
           // 如果有位置和歌曲，記錄播放資料
           if (location && currentHex) {
+            console.log('準備記錄播放資料:', { track: track.name, location, currentHex });
             await recordPlayback(track);
+          } else {
+            console.log('缺少記錄播放所需資料:', { hasLocation: !!location, hasCurrentHex: !!currentHex });
           }
+        } else {
+          console.log('沒有正在播放的歌曲');
+          setCurrentTrack(null);
         }
       } else {
+        console.log('沒有當前播放的歌曲或 Spotify 未打開');
         setCurrentTrack(null);
       }
     } catch (error) {

@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const h3 = require('h3-js');
 const { query } = require('../config/database');
+const { mapDataCache, hexDataCache } = require('../middleware/cache');
 
 const H3_RESOLUTION = parseInt(process.env.H3_RESOLUTION) || 9;
 
-// 獲取地圖資料 (用於地圖渲染)
-router.get('/data', async (req, res) => {
+// 獲取地圖資料 (用於地圖渲染) - 添加緩存
+router.get('/data', mapDataCache, async (req, res) => {
   const { lat, lng, zoom, radius = 2000 } = req.query;
 
   if (!lat || !lng) {

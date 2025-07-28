@@ -1,6 +1,6 @@
 module.exports = {
-  preset: '@testing-library/react-native',
-  setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect'],
+  preset: 'react-native',
+  setupFilesAfterEnv: ['<rootDir>/test-setup.js'],
   testMatch: [
     '**/__tests__/**/*.(ts|tsx|js)',
     '**/*.(test|spec).(ts|tsx|js)'
@@ -17,12 +17,17 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+      isolatedModules: true,
+    }],
+    '^.+\\.(js|jsx)$': 'babel-jest',
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo|react-native-maps|react-native-svg)/)',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|react-native-maps|react-native-svg|@react-navigation)/)',
   ],
+  testEnvironment: 'jsdom',
 };

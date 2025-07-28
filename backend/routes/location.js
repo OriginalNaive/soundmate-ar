@@ -3,6 +3,7 @@ const router = express.Router();
 const h3 = require('h3-js');
 const { query } = require('../config/database');
 const { validate, schemas } = require('../middleware/validation');
+const { hexDataCache } = require('../middleware/cache');
 
 // H3 解析度設定
 const H3_RESOLUTION = parseInt(process.env.H3_RESOLUTION) || 9; // 預設使用 resolution 9

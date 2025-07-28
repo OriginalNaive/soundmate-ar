@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const DEV_CONFIG = {
   // 在真機上使用電腦IP，在模擬器上使用localhost
   HOST: Platform.OS === 'ios' || Platform.OS === 'android' ? '192.168.1.106' : 'localhost',
-  PORT: '5002'
+  PORT: '5000'
 };
 
 // API 基礎URL
@@ -14,7 +14,7 @@ export const API_BASE_URL = `http://${DEV_CONFIG.HOST}:${DEV_CONFIG.PORT}/api`;
 // API 端點
 export const API_ENDPOINTS = {
   HEALTH: '/health',
-  MAP_HEXAGONS: '/map/hexagons',
+  MAP_HEXAGONS: '/map/data',
   MAP_HEX_DETAILS: (hexId: string) => `/map/hex/${hexId}`,
   MAP_HEX_TRACKS: (hexId: string) => `/map/hex/${hexId}/tracks`,
   LOCATION_UPDATE: '/location/update',

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { validate, schemas } = require('../middleware/validation');
+const { musicFeatureCache, playbackHistoryCache } = require('../middleware/cache');
 
 // 中間件：驗證 access token
 const verifyToken = (req, res, next) => {

@@ -1,5 +1,5 @@
 const { logger } = require('../config/logger');
-const HexProperty = require('../models/HexProperty');
+const { HexProperty } = require('../models');
 
 class HexAggregationService {
   constructor() {

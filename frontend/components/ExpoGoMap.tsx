@@ -74,16 +74,40 @@ export default function ExpoGoMap({ onHexPress }: ExpoGoMapProps) {
       const east = region.longitude + region.longitudeDelta / 2;
       const west = region.longitude - region.longitudeDelta / 2;
 
-      console.log(`🌐 嘗試連接到: ${API_BASE_URL}/map/hexagons`);
+      console.log(`🌐 嘗試連接到: ${API_BASE_URL}/map/data`);
       
+      const zoom = Math.round(15 - Math.log2(region.latitudeDelta));
       const response = await fetchWithRetry(
-        `${API_BASE_URL}/map/hexagons?north=${north}&south=${south}&east=${east}&west=${west}`
+        `${API_BASE_URL}/map/data?lat=${region.latitude}&lng=${region.longitude}&zoom=${zoom}`
       );
 
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data.hexagons.length > 0) {
           console.log(`✅ 載入 ${data.data.hexagons.length} 個真實六邊形`);
+          console.log('第一個六邊形資料:', data.data.hexagons[0]);
+          
+          // 計算六邊形的邊界來調整地圖範圍
+          const hexes = data.data.hexagons;
+          const lats = hexes.map(h => h.center_lat);
+          const lngs = hexes.map(h => h.center_lng);
+          
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLng = Math.min(...lngs);
+          const maxLng = Math.max(...lngs);
+          
+          // 調整 region 以包含所有六邊形，並添加一些邊距
+          const latDelta = (maxLat - minLat) * 1.5 || 0.01;
+          const lngDelta = (maxLng - minLng) * 1.5 || 0.01;
+          
+          setRegion({
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2,
+            latitudeDelta: Math.max(latDelta, 0.005),
+            longitudeDelta: Math.max(lngDelta, 0.005)
+          });
+          
           setHexagons(data.data.hexagons);
           setError(null);
           return;
@@ -125,20 +149,40 @@ export default function ExpoGoMap({ onHexPress }: ExpoGoMapProps) {
   };
 
   const latToY = (lat: number) => {
-    const normalizedLat = (lat - (region.latitude - region.latitudeDelta / 2)) / region.latitudeDelta;
-    return (1 - normalizedLat) * (screenHeight * 0.6);
+    // 修復座標轉換：確保 lat 在 region 範圍內時返回正數
+    const minLat = region.latitude - region.latitudeDelta / 2;
+    const maxLat = region.latitude + region.latitudeDelta / 2;
+    const normalizedLat = (lat - minLat) / region.latitudeDelta;
+    const y = (1 - normalizedLat) * (screenHeight * 0.6);
+    return Math.max(0, Math.min(screenHeight * 0.6, y));
   };
 
   const lngToX = (lng: number) => {
-    const normalizedLng = (lng - (region.longitude - region.longitudeDelta / 2)) / region.longitudeDelta;
-    return normalizedLng * (screenWidth * 0.9);
+    // 修復座標轉換：確保 lng 在 region 範圍內時返回正數  
+    const minLng = region.longitude - region.longitudeDelta / 2;
+    const maxLng = region.longitude + region.longitudeDelta / 2;
+    const normalizedLng = (lng - minLng) / region.longitudeDelta;
+    const x = normalizedLng * (screenWidth * 0.9);
+    return Math.max(0, Math.min(screenWidth * 0.9, x));
   };
 
   const renderHexagon = (hex: HexagonData, index: number) => {
     const x = lngToX(hex.center_lng);
     const y = latToY(hex.center_lat);
 
+    // 調試日誌
+    if (index === 0) {
+      console.log('第一個六邊形渲染位置:', { 
+        hexId: hex.hex_id, 
+        x, y, 
+        screenWidth: screenWidth * 0.9, 
+        screenHeight: screenHeight * 0.6,
+        color: hex.color_hex 
+      });
+    }
+
     if (x < 0 || x > screenWidth * 0.9 || y < 0 || y > screenHeight * 0.6) {
+      console.log(`六邊形 ${hex.hex_id} 超出範圍:`, { x, y });
       return null;
     }
 

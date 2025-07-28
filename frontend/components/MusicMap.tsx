@@ -98,9 +98,10 @@ export default function MusicMap({ onHexPress }: MusicMapProps) {
       const west = region.longitude - region.longitudeDelta / 2;
 
       // 呼叫後端 API 獲取該區域的六邊形資料
-      const API_BASE_URL = 'http://localhost:5000/api';
+      const { API_BASE_URL } = require('@/config/api');
+      const zoom = Math.round(15 - Math.log2(region.latitudeDelta));
       const response = await fetch(
-        `${API_BASE_URL}/map/hexagons?north=${north}&south=${south}&east=${east}&west=${west}`
+        `${API_BASE_URL}/map/data?lat=${region.latitude}&lng=${region.longitude}&zoom=${zoom}`
       );
 
       if (response.ok) {

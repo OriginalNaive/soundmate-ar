@@ -22,7 +22,7 @@ export default function NetworkTest() {
         
         // 測試地圖API
         const mapResponse = await fetchWithRetry(
-          `${API_BASE_URL}/map/hexagons?north=25.04&south=25.02&east=121.58&west=121.55`
+          `${API_BASE_URL}/map/data?lat=25.033&lng=121.5654&zoom=15`
         );
         
         if (mapResponse.ok) {
@@ -45,7 +45,7 @@ API地址: ${API_BASE_URL}`);
 嘗試連接: ${API_BASE_URL}
 建議檢查:
 1. 電腦和手機在同一WiFi網路
-2. 防火牆設定允許5002端口
+2. 防火牆設定允許5000端口
 3. 服務器正在運行`);
     } finally {
       setTesting(false);
@@ -77,7 +77,7 @@ API地址: ${API_BASE_URL}`);
       <TouchableOpacity 
         style={styles.copyButton} 
         onPress={() => {
-          Alert.alert('API資訊', `API地址: ${API_BASE_URL}\n電腦IP: 192.168.1.106\n端口: 5002`);
+          Alert.alert('API資訊', `API地址: ${API_BASE_URL}\n電腦IP: 192.168.1.106\n端口: 5000`);
         }}
       >
         <Text style={styles.copyButtonText}>📋 查看API資訊</Text>

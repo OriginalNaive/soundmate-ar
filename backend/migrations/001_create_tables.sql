@@ -3,7 +3,6 @@
 
 -- 啟用 UUID 擴展
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis"; -- 如果需要地理空間功能
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
@@ -189,7 +188,4 @@ COMMENT ON TABLE user_sessions IS '用戶會話表';
 COMMENT ON COLUMN user_playback.hex_id IS 'H3 六角形 ID (Resolution 9)';
 COMMENT ON COLUMN hex_top_tracks.rank_score IS '排名分數 = play_count * 0.7 + unique_users * 0.3';
 
--- 完成 Migration
-INSERT INTO migration_history (version, description, executed_at) 
-VALUES ('001', 'Create all tables and initial schema', CURRENT_TIMESTAMP)
-ON CONFLICT (version) DO NOTHING;
+-- Migration 001 完成

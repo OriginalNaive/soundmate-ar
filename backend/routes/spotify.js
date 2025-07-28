@@ -237,4 +237,56 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// 同步用戶資訊到數據庫 (用於前端直接認證的情況)
+router.post('/sync', async (req, res) => {
+  const { user_data, access_token } = req.body;
+  
+  if (!user_data || !access_token) {
+    return res.status(400).json({ 
+      success: false, 
+      error: { code: 'MISSING_DATA', message: 'User data and access token are required' }
+    });
+  }
+
+  try {
+    const User = require('../models/User');
+    
+    // 創建或更新用戶記錄
+    const savedUser = await User.createOrUpdate({
+      spotify_id: user_data.spotify_id,
+      display_name: user_data.display_name,
+      email: user_data.email,
+      profile_image_url: user_data.profile_image_url,
+      access_token,
+      refresh_token: null, // 前端認證沒有 refresh token
+      expires_in: 3600 // 默認 1小時
+    });
+
+    res.json({ 
+      success: true, 
+      data: {
+        user: {
+          id: savedUser.id,
+          spotify_id: savedUser.spotify_id,
+          display_name: savedUser.display_name,
+          email: savedUser.email,
+          profile_image_url: savedUser.profile_image_url
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('User sync error:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: { 
+        code: 'SYNC_FAILED', 
+        message: 'Failed to sync user data',
+        details: err.message
+      }
+    });
+  }
+});
+
 module.exports = router;
